@@ -1,0 +1,48 @@
+{
+  "policies": {
+    "Bookmarks": [
+      {
+        "Folder": "ctfairhousing",
+        "Placement": "toolbar",
+        "Title": "CFHC Database",
+        "URL": "https://ctfairhousing.com/cfhcdb2012"
+      },
+      {
+        "Folder": "ctfairhousing",
+        "Placement": "toolbar",
+        "Title": "Office 365",
+        "URL": "http://portal.office.com/"
+      },
+      {
+        "Folder": "ctfairhousing",
+        "Placement": "toolbar",
+        "Title": "CFHC Website",
+        "URL": "https://ctfairhousing.org"
+      },
+      {
+        "Folder": "ctfairhousing",
+        "Placement": "toolbar",
+        "Title": "CT CMECF",
+        "URL": "http://ecf.ctd.uscourts.gov/"
+      },
+      {
+        "Folder": "ctfairhousing",
+        "Placement": "toolbar",
+        "Title": "Judicial e-Services",
+        "URL": "http://eservices.jud.ct.gov/Login.aspx"
+      }
+    ],
+    "DisableFirefoxAccounts": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DisableTelemetry": true,
+    "DisplayBookmarksToolbar": true,
+    "Extensions": {
+      "Install": [
+        "https://addons.mozilla.org/firefox/downloads/file/3452970/ublock_origin-1.24.2-an+fx.xpi"
+      ]
+    },
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": ""
+  }
+}
