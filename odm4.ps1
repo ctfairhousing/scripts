@@ -1,4 +1,4 @@
-﻿######## 
+######## 
 #OneDriveMapper
 #Copyright:         Commercial (re)use not allowed without prior written consent by the author, otherwise free to use. Please leave this header intact. 
 #Author:            Jos Lieben (Lieben Consultancy)
@@ -14,7 +14,6 @@ param(
 )
 
 $version = "4.07"
-            #Set to true if using Azure Ad Connect SSO. Do NOT set the aadg.windows.net.nsatc.net and autologon.microsoftazuread-sso.com zones forcibly through GPO as ODM will temporarily remove them for mapping and then readd them
 
 ####REQUIRED MANUAL CONFIGURATION
 $O365CustomerName      = "ctfairhousing"          #This should be the name of your tenant (example, lieben as in lieben.onmicrosoft.com) 
@@ -37,6 +36,17 @@ $desiredMappings =  @(
     @{"displayName"="Shared";"targetLocationType"="driveletter";"targetLocationPath"="S:";"sourceLocationPath"="https://ctfairhousing.sharepoint.com";"mapOnlyForSpecificGroup"=""}
 )
 
+<#
+EXAMPLE SETTINGS (Onedrive for Business, two Sharepoint sites, one mapped to a driveletter, one to a shortcut, the last only when a member of the Active Directory group SEC-SHAREPOINTA and two sharepoint sites mapped as links (converged) into a fake driveletter Y)
+$desiredMappings =  @(
+    @{"displayName"="Onedrive for Business";"targetLocationType"="driveletter";"targetLocationPath"="X:";"sourceLocationPath"="autodetect";"mapOnlyForSpecificGroup"=""},
+    @{"displayName"="Sharepoint Site A";"targetLocationType"="networklocation";"targetLocationPath"="$env:APPDATA\Microsoft\Windows\Network Shortcuts";"sourceLocationPath"="https://lieben.sharepoint.com/sites/lieben/Gedeelde%20%20documenten/Forms/AllItems.aspx";"mapOnlyForSpecificGroup"="SEC-SHAREPOINTA"}
+    @{"displayName"="Sharepoint Site A";"targetLocationType"="driveletter";"targetLocationPath"="Z:";"sourceLocationPath"="https://lieben.sharepoint.com/sites/groep30/Gedeelde%20%20documenten/Forms/AllItems.aspx";"mapOnlyForSpecificGroup"=""}
+    @{"displayName"="Sharepoint Site B";"targetLocationType"="converged";"targetLocationPath"="Y:";"sourceLocationPath"="https://lieben.sharepoint.com/sites/groep30/Gedeelde%20%20documenten/Forms/AllItems.aspx";"mapOnlyForSpecificGroup"="AD Group SPSB"} 
+    @{"displayName"="Sharepoint Site C";"targetLocationType"="converged";"targetLocationPath"="Y:";"sourceLocationPath"="https://lieben.sharepoint.com/sites/groep30/Gedeelde%20%20documenten/Forms/AllItems.aspx";"mapOnlyForSpecificGroup"="AD Group SPSC"} 
+)
+#>
+
 $redirectFolders       = $false #Set to TRUE and configure below hashtable to redirect folders to locations you're mapping (e.g. onedrive, teams, sharepoint)
 $listOfFoldersToRedirect = @(#One line for each folder you want to redirect, only works if redirectFolders=$True. For knownFolderInternalName choose from Get-KnownFolderPath function, for knownFolderInternalIdentifier choose from Set-KnownFolderPath function
     @{"knownFolderInternalName" = "Desktop";"knownFolderInternalIdentifier"="Desktop";"desiredTargetPath"="X:\Desktop";"copyExistingFiles"="true"}
@@ -55,7 +65,7 @@ $persistentMapping     = $True                     #If set to $False, the mappin
 $urlOpenAfter          = ""                        #This URL will be opened by the script after running if you configure it
 $showProgressBar       = $True                     #will show a progress bar to the user
 $progressBarColor      = "#CC99FF"
-$progressBarText       = "(Re)connecting your shared drive..."
+$progressBarText       = "Reconnecting Shared Drive. (Please sign in or click 'yes' if prompted)"
 $convergedDriveLabel   = "Sharepoint and Team sites" #used only if you're doing converged drive mappings
 $autoDetectProxy       = $False                    #if set to $False, unchecks the 'Automatically detect proxy settings' setting in IE; this greatly enhanced WebDav performance, set to true to not modify this IE setting (leave as is)
 $autoProtectedMode     = $True                     #Automatically temporarily disable IE Protected Mode if it is enabled. ProtectedMode has to be disabled for the script to function 
