@@ -1,17 +1,7 @@
-$DesktopPath = [Environment]::GetFolderPath("Desktop")
-
-	if (Test-Path "$desktoppath\Microsoft Edge.lnk") {
-		remove-item "$DesktopPath\Microsoft Edge.lnk"
-	}
-
-	if (Test-Path "$desktoppath\Google Chrome.lnk") {
-		remove-item "$DesktopPath\Google Chrome.lnk"
-	}
-
 $version = "3.21"
 
 ####MANDATORY MANUAL CONFIGURATION
-$authMethod            = "native"                  #Uses AzureAD integrated when set to "azure", Uses IE automation (old method) when set to "ie", uses new native method when set to "native"
+$authMethod            = "azure"                  #Uses AzureAD integrated when set to "azure", Uses IE automation (old method) when set to "ie", uses new native method when set to "native"
 $O365CustomerName      = "ctfairhousing"          #This should be the name of your tenant (example, ogd as in ogd.onmicrosoft.com) 
 $debugmode             = $False                    #Set to $True for debugging purposes. You'll be able to see the script navigate in Internet Explorer if you're using IE auth mode
 $userLookupMode        = 3                         #1 = Active Directory UPN, 2 = Active Directory Email, 3 = Azure AD Joined Windows 10, 4 = query user for his/her login, 5 = lookup by registry key, 6 = display full form (ask for both username and login if no cached versions can be found), 7 = whoami /upn
