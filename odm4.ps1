@@ -17,8 +17,8 @@ $version = "4.08"
 
 ####REQUIRED MANUAL CONFIGURATION
 $O365CustomerName      = "ctfairhousing"          #This should be the name of your tenant (example, lieben as in lieben.onmicrosoft.com) 
-$showConsoleOutput     = $True             #Set this to $False to hide console output
-$showElevatedConsole   = $True
+$showConsoleOutput     = $False             #Set this to $False to hide console output
+$showElevatedConsole   = $False
 $useAzAdConnectSSO     = $false            #Set to true if using Azure Ad Connect SSO. Do NOT set the aadg.windows.net.nsatc.net and autologon.microsoftazuread-sso.com zones forcibly through GPO as ODM will temporarily remove them for mapping and then readd them
 
 <#
