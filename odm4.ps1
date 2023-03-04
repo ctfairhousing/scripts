@@ -13,12 +13,12 @@ param(
     [Switch]$hideConsole
 )
 
-$version = "4.07"
+$version = "4.08"
 
 ####REQUIRED MANUAL CONFIGURATION
 $O365CustomerName      = "ctfairhousing"          #This should be the name of your tenant (example, lieben as in lieben.onmicrosoft.com) 
-$showConsoleOutput     = $False             #Set this to $False to hide console output
-$showElevatedConsole   = $False
+$showConsoleOutput     = $True             #Set this to $False to hide console output
+$showElevatedConsole   = $True
 $useAzAdConnectSSO     = $false            #Set to true if using Azure Ad Connect SSO. Do NOT set the aadg.windows.net.nsatc.net and autologon.microsoftazuread-sso.com zones forcibly through GPO as ODM will temporarily remove them for mapping and then readd them
 
 <#
@@ -56,8 +56,12 @@ $listOfFoldersToRedirect = @(#One line for each folder you want to redirect, onl
 
 ###OPTIONAL CONFIGURATION
 $autoRemapMethod       = "Path"                    #automatically rerun if a connection is dropped / lost but an active internet connection exists. Options: "Path" (checks underlying webdav connection), "Link" (checks existence of driveletter or shortcut as well, only works for drivemappings and converged drives), "Disabled" (no reruns)
+$autoMapFavoriteSites  = $True                     #Set to $True to automatically map any sites/teams/groups the user has favorited (https://yourtenantname.sharepoint.com/_layouts/15/sharepoint.aspx?v=following)
+$autoMapFavoritesDrive = "T"                       #Driveletter when using autoMapFavoriteSites
+$autoMapFavoritesLabel = "Teams"
+$autoMapFavoritesDrvLetterList = "DEFGHIJKLMNPQRSTUVWXYZ" #List of driveletters that shall be used (you can ommit some of your "reserved" letters)
 $restartExplorer       = $False                    #You can safely set this to False if you're not redirecting folders
-$autoResetIE           = $True                     #always clear all Internet Explorer cookies before running (prevents certain occasional issues with IE)
+$autoResetIE           = $False                     #always clear all Internet Explorer cookies before running (prevents certain occasional issues with IE)
 $libraryName           = "Documents"               #leave this default, unless you wish to map a non-default onedrive library you've created. Only used if it cannot be autodetected for some reason
 $autoKillIE            = $True                     #Kill any running Internet Explorer processes prior to running the script to prevent security errors when mapping 
 $displayErrors         = $True                     #show errors to user in visual popups
@@ -65,13 +69,14 @@ $persistentMapping     = $True                     #If set to $False, the mappin
 $urlOpenAfter          = ""                        #This URL will be opened by the script after running if you configure it
 $showProgressBar       = $True                     #will show a progress bar to the user
 $progressBarColor      = "#CC99FF"
-$progressBarText       = "Reconnecting Shared Drive. (Sign in or click 'yes' if prompted)"
-$convergedDriveLabel   = "Sharepoint and Team sites" #used only if you're doing converged drive mappings
-$autoDetectProxy       = $False                    #if set to $False, unchecks the 'Automatically detect proxy settings' setting in IE; this greatly enhanced WebDav performance, set to true to not modify this IE setting (leave as is)
+$progressBarText       = "Reconnecting Shared Drive - click 'yes' or sign in if prompted"
+$convergedDriveLabel   = "Teams" #used only if you're doing converged drive mappings
+$autoDetectProxy       = $True                    #if set to $False, unchecks the 'Automatically detect proxy settings' setting in IE; this greatly enhanced WebDav performance, set to true to not modify this IE setting (leave as is)
 $autoProtectedMode     = $True                     #Automatically temporarily disable IE Protected Mode if it is enabled. ProtectedMode has to be disabled for the script to function 
 $addShellLink          = $False                    #Adds a link to Onedrive to the Shell under Favorites (Windows 7, 8 / 2008R2 and 2012R2 only) If you use a remote path, google EnableShellShortcutIconRemotePath
 $removeExistingMaps    = $True                     #Removes any existing drive mappings if $True ($false to disable)
 $removeEmptyMaps       = $True                     #Removes any existing empty drive maps if $True ($false to disable)
+$favoriteSitesDLName   = "Freigegebene Dokumente"    #Normally autodetected, default document library name in Teams/Groups/Sites to map in conjunction with $autoMapFavoriteSites, note the double spaces! Use Shared  Documents for english language tenants
 $logfile               = ($env:APPDATA + "\OneDriveMapper_$version.log")    #Logfile to log to 
 if($hideConsole){
     $showConsoleOutput     = $False
@@ -638,6 +643,8 @@ function MapDrive{
         try{
             if($driveMapping.sourceLocationPath -eq "autodetect"){
                 $desiredIconPath = $onedriveIconPath
+            }elseif($driveMapping.mapOnlyForSpecificGroup -eq "favoritesPlaceholder"){
+                $desiredIconPath = $teamsIconPath
             }else{
                 $desiredIconPath = $sharepointIconPath
             }
@@ -1150,6 +1157,49 @@ if($desiredMappings | Where-Object{$_.mapOnlyForSpecificGroup.Length -gt 0}){
     }
 }
 
+if($autoMapFavoriteSites){
+    $suffixCounter = 0
+    #get drives already in use
+    $drvlist=(Get-PSDrive -PSProvider filesystem).Name
+    #add already planned mappings to in use list
+    foreach($mapping in $desiredMappings){
+        if($mapping.targetLocationType -eq "driveletter"){
+            if($drvlist -notcontains $($mapping.targetLocationPath.Substring(0,1))){
+                $drvList += $($mapping.targetLocationPath.Substring(0,1))
+            }
+        }
+    }
+    #get first free driveletter for a converged fake mapping to contain all links
+    if($drvlist -contains $autoMapFavoritesDrive){
+        Foreach ($drvletter in $autoMapFavoritesDrvLetterList.ToCharArray()) {
+            If ($drvlist -notcontains $drvletter) {
+                log -text "You set $autoMapFavoritesDrive as converged driveletter, but it is not available, using $drvletter instead" -warning
+                $drvlist += $drvletter
+                $autoMapFavoritesDriveletter = $drvletter
+                break
+            }
+        }
+    }else{
+        $drvlist += $autoMapFavoritesDrive
+        $autoMapFavoritesDriveletter = $autoMapFavoritesDrive            
+    }   
+    $targetFolder = Join-Path $Env:TEMP -ChildPath "OnedriveMapperLinks" 
+    if(![System.IO.Directory]::Exists($targetFolder)){
+        log -text "Desired path for Team site links: $targetFolder does not exist, creating"
+        try{
+            $res = New-Item -Path $targetFolder -ItemType Directory -Force
+        }catch{
+            log -text "Failed to create folder $targetFolder! $($Error[0])" -fout
+        }
+    }else{
+        try{
+            Get-ChildItem $targetFolder | Remove-Item -Force -Confirm:$False -Recurse
+        }catch{$Null}
+    }
+    $res = subst "$($autoMapFavoritesDriveletter):" $targetFolder
+    labelDrive "$($autoMapFavoritesDriveLetter):" $autoMapFavoritesDriveLetter $autoMapFavoritesLabel
+}
+
 if($autoDetectProxy -eq $False){
     $path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     $val = checkRegistryKeyValue -basePath $path -entryName "AutoDetect"
@@ -1191,30 +1241,6 @@ for($count=0;$count -lt $desiredMappings.Count;$count++){
         }
     }
     $intendedmappings += $desiredMappings[$count]
-}
-
-#prepare converged drives if configured
-$convergedDrives = @($intendedMappings | Where-Object {$_.targetLocationType -eq "converged"})
-if($convergedDrives){
-    $convergedDriveLetters = $convergedDrives.targetLocationPath | Select-Object -Unique
-    foreach($convergedDriveletter in $convergedDriveLetters){
-        $targetFolder = Join-Path $Env:TEMP -ChildPath "OnedriveMapperLinks $($convergedDriveletter.SubString(0,1))" 
-        if(![System.IO.Directory]::Exists($targetFolder)){
-            log -text "Converged drive source folder $targetFolder does not exist, creating"
-            try{
-                $res = New-Item -Path $targetFolder -ItemType Directory -Force
-                log -text "Converged drive $convergedDriveletter created in $targetFolder"
-            }catch{
-                log -text "Failed to create folder $targetFolder! $($Error[0])" -fout
-            }
-        }else{
-            try{
-                Get-ChildItem $targetFolder | Remove-Item -Force -Confirm:$False -Recurse
-            }catch{$Null}
-        }
-        $res = subst "$($convergedDriveletter)" $targetFolder
-        labelDrive "$($convergedDriveletter)" $convergedDriveletter.SubString(0,1) $convergedDriveLabel
-    }
 }
 
 if($autoResetIE){
@@ -1428,9 +1454,84 @@ while($true){
         }
     }
 
+    if($autoMapFavoriteSites){
+        log -text "detecting user favorited sites"
+        $suffixCounter = 0
+        $script:ie.navigate("https://$O365CustomerName.sharepoint.com/_layouts/15/sharepoint.aspx?v=following")
+        waitForIE
+        start-AuthCheck
+        Start-Sleep -Seconds 1
+        $script:ie.navigate("https://$($O365CustomerName).sharepoint.com/_layouts/15/sharepoint.aspx?v=following")
+        waitForIE
+        try{
+            $obj = $ie.Document.links | where{$_.outerHTML -like "*doContinueNav*"}
+            $obj.click()
+        }catch{$Null}
+
+        Start-Sleep -Seconds 1
+        if($script:ie.LocationURL -eq "https://$($O365CustomerName).sharepoint.com/_layouts/15/sharepoint.aspx?v=following"){
+            try{
+                $index = $script:ie.Document.body.innerHTML.IndexOf("SPHomeWebVroom:sites/followed")
+                $index2 = $script:ie.Document.body.innerHTML.IndexOf("SPHomeWeb:sites/followed")
+            }catch{
+                $index = -1
+                $index2 = -1
+            }
+            if($index -ne -1){
+                $htmlBody = $script:ie.Document.body.innerHTML
+                $startJson = $htmlBody.IndexOf("cacheValue",$index)+13
+                $endJson = $htmlBody.IndexOf("SPHomeWebVroom:sites/recent",$startJson)
+                try{
+                    $favoritedSites = $htmlBody.Substring($startJson,($endJson-$startJson-4)).Replace('\"','"') | convertfrom-json
+                }catch{
+                    log -text "No favorited sites detected in VROOM section"
+                    $favoritedSites = $Null
+                }
+                foreach($favoriteSite in $favoritedSites.Items){
+                    $suffix = $Null
+                    if(@($intendedMappings | Where-Object {$_.displayName -eq $favoriteSite.Title}).Count -gt 0){
+                        $suffixCounter++    
+                        $suffix = $suffixCounter
+                    }          
+                    $desiredUrl = $favoriteSite.webUrl.Replace("https://","\\").Replace("/_layouts/15/start.aspx#","").Replace("sharepoint.com/","sharepoint.com@SSL\DavWWWRoot\").Replace("/Forms/AllItems.aspx","").Replace("/","\")
+                    if(@($intendedMappings | Where-Object {$_.webDavPath -eq $desiredUrl}).Count -eq 0){
+                        $intendedMappings +=   @{"displayName"="$($favoriteSite.Title)$suffix";"targetLocationType"="networklocation";"targetLocationPath"="$($autoMapFavoritesDriveletter):";"sourceLocationPath" = $favoriteSite.webUrl; "webDavPath"=$desiredUrl;"mapOnlyForSpecificGroup"="favoritesPlaceholder"}
+                        log -text "Adding $($favoriteSite.webUrl) as $($favoriteSite.Title)$suffix to mapping list as network shortcut in a converged drive with letter $autoMapFavoritesDriveletter"               
+                    }else{
+                        log -text "Not adding $($favoriteSite.webUrl) as $($favoriteSite.Title)$suffix to mapping list as it was already in the intended mapping list"               
+                    }
+                }   
+            }
+            if($index2 -ne -1){
+                $htmlBody = $script:ie.Document.body.innerHTML
+                $startJson = $htmlBody.IndexOf("cacheValue",$index2)+13
+                $endJson = $htmlBody.IndexOf("SPHomeWeb:sites/recent",$startJson)
+                try{
+                    $favoritedSites = $htmlBody.Substring($startJson,($endJson-$startJson-4)).Replace('\"','"') | convertfrom-json
+                }catch{
+                    log -text "No favorite sites detected in standard section"
+                    $favoritedSites = $Null
+                }
+                foreach($favoriteSite in $favoritedSites.Items){
+                    $suffix = $Null
+                    if(@($intendedMappings | Where-Object {$_.displayName -eq $favoriteSite.Title}).Count -gt 0){
+                        $suffixCounter++    
+                        $suffix = $suffixCounter
+                    }          
+                    $desiredUrl = $favoriteSite.Url.Replace("https://","\\").Replace("/_layouts/15/start.aspx#","").Replace("sharepoint.com/","sharepoint.com@SSL\DavWWWRoot\").Replace("/Forms/AllItems.aspx","").Replace("/","\")
+                    if(@($intendedMappings | Where-Object {$_.webDavPath -eq $desiredUrl}).Count -eq 0){
+                        $intendedMappings +=   @{"displayName"="$($favoriteSite.Title)$suffix";"targetLocationType"="networklocation";"targetLocationPath"="$($autoMapFavoritesDriveletter):";"sourceLocationPath" = $favoriteSite.Url; "webDavPath"=$desiredUrl;"mapOnlyForSpecificGroup"="favoritesPlaceholder"}
+                        log -text "Adding $($favoriteSite.Url) as $($favoriteSite.Title)$suffix to mapping list as network shortcut in a converged drive with letter $autoMapFavoritesDriveletter"               
+                    }else{
+                        log -text "Not adding $($favoriteSite.Url) as $($favoriteSite.Title)$suffix to mapping list as it was already in the intended mapping list"               
+                    }
+                }  
+            }
+        }
+    }
+
     #generate cookies and map
     for($count=0;$count -lt $intendedMappings.Count;$count++){
-        $finalLocationUrl = $Null
         if($intendedMappings[$count].mapped){continue}
         if($intendedMappings[$count].sourceLocationPath -eq "autodetect"){
             $timeSpent = 0
@@ -1461,7 +1562,6 @@ while($true){
             }
             $intendedMappings[$count].webDavPath = $mapURL 
             log -text "Detected user: $($userURL)"
-            $finalLocationUrl = $script:ie.LocationURL.Replace("_layouts/15/onedrive.aspx",$libraryName)
             log -text "Onedrive cookie generated" 
         }else{
             log -text "Initiating Sharepoint session with: $($intendedMappings[$count].sourceLocationPath)"
@@ -1491,25 +1591,34 @@ while($true){
                     $script:form1.Refresh()
                 }
             }
-            $finalLocationUrl = $script:ie.LocationURL.Replace("/Forms/AllItems.aspx","")
             log -text "SpO cookie generated"
+            if($intendedMappings[$count]."mapOnlyForSpecificGroup" -eq "favoritesPlaceholder"){
+                try{
+                    $startJson = $script:ie.Document.body.innerHTML.IndexOf("`"navigationInfo`":{")+17
+                    $endJson = $script:ie.Document.body.innerHTML.IndexOf("`"appBarParams`"",$startJson)
+                    $doclibs = $script:ie.Document.body.innerHTML.Substring($startJson,($endJson-$startJson-1)) | convertfrom-json
+                    $documentLibrary = ($docLibs.quickLaunch | Where-Object{$_.IsDocLib})[0]
+                    if(!$documentLibrary){
+                        Throw
+                    }else{
+                        $prefix = $spURL.SubString($spURL.IndexOf(".com")+4)
+                        $startLoc = $prefix.Length+1
+                        $endLoc = ([regex]::Unescape($documentLibrary.Url)).IndexOf("/", $startLoc)
+                        $dlName = ([regex]::Unescape($documentLibrary.Url)).SubString($startLoc,$endLoc-$startLoc)
+                        if(!$intendedMappings[$count].webDavPath.EndsWith($dlName)) {
+                            $intendedMappings[$count].webDavPath = "$($intendedMappings[$count].webDavPath)\$($dlName)"
+                        }
+                        log -text "auto detected document library url: $($intendedMappings[$count].webDavPath)"
+                    }
+                }catch{
+                    log -text "Failed to auto detect document library name for $($intendedMappings[$count].displayName), defaulting to $($intendedMappings[$count].webDavPath)\$($favoriteSitesDLName)" -fout
+                    if(!$intendedMappings[$count].webDavPath.EndsWith($favoriteSitesDLName)){
+                        $intendedMappings[$count].webDavPath = "$($intendedMappings[$count].webDavPath)\$($favoriteSitesDLName)" 
+                    }  
+                }
+                
+            }
         }
-
-        <#possible future fix for KMSI disabled tenants, but ugly explorer popup should be witheld, perhaps by blocking activeX: https://support.microsoft.com/en-us/office/open-in-explorer-or-view-with-file-explorer-in-sharepoint-66b574bb-08b4-46b6-a6a0-435fd98194cc
-        if($finalLocationUrl.EndsWith($libraryName)){
-            #Direct document library link, try the 'Open in Explorer View' option
-            log -text "$($intendedMappings[$count].sourceLocationPath) mapping links directly to a library, good! Attempting to set extra persistent cookie"
-            $OiEVLinkPrefix = $finalLocationUrl
-            $OiEVLinkSuffix = $OiEVLinkPrefix.Split("/")[3..$OiEVLinkPrefix.Split("/").Length] -Join("/")
-            $OiEVLinkSuffix = [uri]::EscapeDataString("/$($OiEVLinkSuffix.Replace("%20"," "))")
-            $OiEVLink = "$($OiEVLinkPrefix)?ExplorerWindowUrl=$($OiEVLinkSuffix)"
-            $script:ie.navigate($OiEVLink)
-            
-            waitForIE
-        }else{
-            log -text "$($intendedMappings[$count].sourceLocationPath) mapping does not link directly to a library, mapping may fail if you disabled KMSI in AzureAD/O365" -fout
-        }
-        #>
 
         $intendedMappings[$count].mapped = MapDrive $intendedMappings[$count]
         if($intendedMappings[$count].sourceLocationPath -eq "autodetect"){       
