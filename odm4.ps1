@@ -56,7 +56,7 @@ $listOfFoldersToRedirect = @(#One line for each folder you want to redirect, onl
 
 ###OPTIONAL CONFIGURATION
 $autoRemapMethod       = "Path"                    #automatically rerun if a connection is dropped / lost but an active internet connection exists. Options: "Path" (checks underlying webdav connection), "Link" (checks existence of driveletter or shortcut as well, only works for drivemappings and converged drives), "Disabled" (no reruns)
-$autoMapFavoriteSites  = $True                     #Set to $True to automatically map any sites/teams/groups the user has favorited (https://yourtenantname.sharepoint.com/_layouts/15/sharepoint.aspx?v=following)
+$autoMapFavoriteSites  = $False                     #Set to $True to automatically map any sites/teams/groups the user has favorited (https://yourtenantname.sharepoint.com/_layouts/15/sharepoint.aspx?v=following)
 $autoMapFavoritesDrive = "T"                       #Driveletter when using autoMapFavoriteSites
 $autoMapFavoritesLabel = "Teams"
 $autoMapFavoritesDrvLetterList = "DEFGHIJKLMNPQRSTUVWXYZ" #List of driveletters that shall be used (you can ommit some of your "reserved" letters)
@@ -73,8 +73,6 @@ $progressBarText       = "Reconnecting Shared Drive - click 'yes' or sign in if 
 $convergedDriveLabel   = "Teams" #used only if you're doing converged drive mappings
 $autoDetectProxy       = $True                    #if set to $False, unchecks the 'Automatically detect proxy settings' setting in IE; this greatly enhanced WebDav performance, set to true to not modify this IE setting (leave as is)
 $autoProtectedMode     = $True                     #Automatically temporarily disable IE Protected Mode if it is enabled. ProtectedMode has to be disabled for the script to function 
-$addShellLink          = $False                    #Adds a link to Onedrive to the Shell under Favorites (Windows 7, 8 / 2008R2 and 2012R2 only) If you use a remote path, google EnableShellShortcutIconRemotePath
-$removeExistingMaps    = $True                     #Removes any existing drive mappings if $True ($false to disable)
 $removeEmptyMaps       = $True                     #Removes any existing empty drive maps if $True ($false to disable)
 $favoriteSitesDLName   = "Freigegebene Dokumente"    #Normally autodetected, default document library name in Teams/Groups/Sites to map in conjunction with $autoMapFavoriteSites, note the double spaces! Use Shared  Documents for english language tenants
 $logfile               = ($env:APPDATA + "\OneDriveMapper_$version.log")    #Logfile to log to 
